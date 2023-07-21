@@ -1,18 +1,14 @@
+<template>
+  <HelloWorld />
+</template>
+
 <script setup>
 import HelloWorld from './components/HelloWorld.vue'
-</script>
+import { useAuthStore } from "./store/auth";
 
-<template>
-  <div>
-    <a href="https://vitejs.dev" target="_blank">
-      <img src="/vite.svg" class="logo" alt="Vite logo" />
-    </a>
-    <a href="https://vuejs.org/" target="_blank">
-      <img src="./assets/vue.svg" class="logo vue" alt="Vue logo" />
-    </a>
-  </div>
-  <HelloWorld msg="Vite + Vue" />
-</template>
+const authStore = useAuthStore();
+authStore.initFirebase();
+</script>
 
 <style scoped>
 .logo {
