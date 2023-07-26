@@ -1,9 +1,8 @@
 <template>
-  <HelloWorld />
+  <router-view />
 </template>
 
 <script setup>
-import HelloWorld from './components/HelloWorld.vue'
 import { useAuthStore } from "./store/auth";
 
 const authStore = useAuthStore();
