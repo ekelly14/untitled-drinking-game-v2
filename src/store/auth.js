@@ -3,6 +3,8 @@ import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
 import { getAuth, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
 import { doc, getDoc, getFirestore } from "firebase/firestore";
+import _filter from "lodash/filter";
+import _isEmpty from "lodash/isEmpty";
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -15,20 +17,23 @@ export const useAuthStore = defineStore('auth', {
       userData: null
     },
     game: {
+      isActive: false,
       turn: 0, // Integer of current turn #, starts at 1 when the first card is pulled
       timers: {}, // Will be for virsus. When the card is pulled, add to this timer counter with a countdown, and text of the secondary prompt
       freeCards: [], // Cards still ready to play. Will randomly be pulled from if the current turn is not a virus
     }
   }),
-  // getters: {
-  // },
+  getters: {
+    hasUserData: (state) => { return !_isEmpty(state.user.userData) },
+    isAuthenticated:(state) => { return Boolean(state.user.firebaseUser) },
+    isGameActive: (state) => { return state.game.isActive },
+    userData: (state) => { return state.user.userData }
+  },
   actions: {
+    startGame() {
+      this.game.isActive = true
+    },
     initFirebase() {
-      // TODO: Add SDKs for Firebase products that you want to use
-      // https://firebase.google.com/docs/web/setup#available-libraries
-
-      // Your web app's Firebase configuration
-      // For Firebase JS SDK v7.20.0 and later, measurementId is optional
       const firebaseConfig = {
         apiKey: "AIzaSyAvRU0kYOhaQXHOMQuzMNmn5JTgTGalj6U",
         authDomain: "untitled-drinking-game.firebaseapp.com",
@@ -53,9 +58,7 @@ export const useAuthStore = defineStore('auth', {
       const auth = getAuth();
       signInWithPopup(auth, provider).then((result) => {
         const credential = GoogleAuthProvider.credentialFromResult(result);
-        // console.log('credential', credential)
         const token = credential.accessToken;
-        // console.log('access token', token)
         const user = result.user;
         console.log('user:', user)
         this.user.firebaseUser = user;
@@ -76,25 +79,54 @@ export const useAuthStore = defineStore('auth', {
         if(userDocSnap.exists()){
           const userDocData = userDocSnap.data();
           // Inflate the decks
+          let populatedDecks = []
           if(userDocData.decks){
-            const deckData = await Promise.all(
-              userDocData.decks.map(async (deck) => {
-                const deckDocRef = doc(db, "decks", deck);
-                const deckSnap = await getDoc(deckDocRef);
-                if(deckSnap.exists()){
-                  console.log(deckSnap.data());
-                } else {
-                  console.log('deckSnap does not exist')
-                }
-              })
-            )
+            console.log('userData', userDocData)
+            populatedDecks = await this.getDecks(userDocData.decks)
+            console.log('final populated decks', populatedDecks)
           }
-          // console.log(userDocSnap.data());
+          this.user.userData = {
+            decks: populatedDecks || userDocData.decks
+          }
         }
       }
+    },
+    async getDecks(decks, dontGrab = []) {
+      const db = this.firebase.firestore;
+      let extraDecks = [];
+      decks = decks.filter(x => !dontGrab.includes(x))
+      const deckData = await Promise.all(
+        decks.map(async (deck) => {
+          console.log('deck', deck)
+          const deckDocRef = doc(db, "decks", deck);
+          const deckSnap = await getDoc(deckDocRef);
+          if(deckSnap.exists()){
+            const deckData = deckSnap.data();
+            if(deckData.decks) extraDecks.push(...deckData.decks)
+            return deckData;
+          } else {
+            console.log('deckSnap does not exist')
+          }
+        })
+      )
+      const newExtraDecks = _filter(extraDecks, x => !decks.includes(x))
+      let populatedExtraDecks = []
+      if(!_isEmpty(newExtraDecks)){
+        populatedExtraDecks = await this.getDecks(newExtraDecks, decks)
+      }
+      return [
+        ...deckData,
+        ...populatedExtraDecks
+      ]
+    },
+    async getPublicDecks() {
+      // TODO: Implement getting decks set to public
+    },
+    addCardsToGame(cards) {
+      this.game.freeCards.push(...cards);
     }
   },
-  persist: {
-    storage: sessionStorage
-  }
+  // persist: {
+  //   storage: sessionStorage
+  // }
 })
