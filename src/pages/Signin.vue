@@ -1,7 +1,7 @@
 <template>
   <p>Hello! Sign in or Quickplay</p>
   <button @click="handleGoogleLogin">Login with Google</button>
-  <button>QuickPlay</button>
+  <button disabled>QuickPlay</button>
 </template>
 <script setup>
 import { useAuthStore } from '../store/auth'

@@ -8,7 +8,7 @@
       <span>{{ deck.description }}</span>
     </div>
   </div>
-  <button @click="handleStartGame">Start Game</button>
+  <button @click="handleStartGame" :disabled="!selectedCards.length">Start Game</button>
 </template>
 <script setup>
 import { useAuthStore } from '../store/auth'
@@ -22,15 +22,14 @@ const selectedDecks = ref([])
 const selectedCards = computed(() => {
   return _flatten(selectedDecks.value.map(deck => {
     return toRaw(authStore.userData).decks.find(o => o.name === deck).cards
-}))
+  }))
 })
-
 
 function handleStartGame() {
   console.log('starting Game')
   console.log(selectedCards.value)
   authStore.addCardsToGame(selectedCards.value)
-  // authStore.startGame()
+  authStore.setGameStatus("player_menu")
 }
 </script>
 <style scoped>

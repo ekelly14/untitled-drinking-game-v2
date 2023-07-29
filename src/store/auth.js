@@ -3,8 +3,13 @@ import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
 import { getAuth, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
 import { doc, getDoc, getFirestore } from "firebase/firestore";
+import { getRandomInt } from "../utils/utils"
 import _filter from "lodash/filter";
 import _isEmpty from "lodash/isEmpty";
+import _forEach from "lodash/forEach";
+import _map from "lodash/map";
+import _head from "lodash/head";
+import _remove from "lodash/remove";
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -17,22 +22,21 @@ export const useAuthStore = defineStore('auth', {
       userData: null
     },
     game: {
-      isActive: false,
-      turn: 0, // Integer of current turn #, starts at 1 when the first card is pulled
-      timers: {}, // Will be for virsus. When the card is pulled, add to this timer counter with a countdown, and text of the secondary prompt
+      gameStatus: "",
+      players: [],
+      turnLimit: 10,
+      turn: 1, // Integer of current turn #, starts at 1 when the first card is pulled
+      timers: [], // Will be for virsus. When the card is pulled, add to this timer counter with a countdown, and text of the secondary prompt
       freeCards: [], // Cards still ready to play. Will randomly be pulled from if the current turn is not a virus
     }
   }),
   getters: {
     hasUserData: (state) => { return !_isEmpty(state.user.userData) },
     isAuthenticated:(state) => { return Boolean(state.user.firebaseUser) },
-    isGameActive: (state) => { return state.game.isActive },
+    gameStatus: (state) => { return state.game.gameStatus },
     userData: (state) => { return state.user.userData }
   },
   actions: {
-    startGame() {
-      this.game.isActive = true
-    },
     initFirebase() {
       const firebaseConfig = {
         apiKey: "AIzaSyAvRU0kYOhaQXHOMQuzMNmn5JTgTGalj6U",
@@ -63,6 +67,7 @@ export const useAuthStore = defineStore('auth', {
         console.log('user:', user)
         this.user.firebaseUser = user;
         this.getUserData();
+        this.game.gameStatus = "decks_menu"
       }).catch((error) => {
         const errorCode = error.code;
         const errorMessage = error.message;
@@ -124,6 +129,57 @@ export const useAuthStore = defineStore('auth', {
     },
     addCardsToGame(cards) {
       this.game.freeCards.push(...cards);
+    },
+    // Game related 
+    setGameStatus(status) {
+      this.game.gameStatus = status;
+    },
+    resetGame() {
+      this.game.gameStatus = "decks_menu";
+      this.game.turn = 1;
+      this.game.timers = {};
+      this.game.freeCards = [];
+    },
+    getNextCard() {
+      console.log('current turn', this.game.turn)
+      console.log('turn limits', this.game.turnLimit)
+      if(this.game.turn > this.game.turnLimit ||
+         this.game.turn <= 0){
+        this.game.gameStatus = "game_over"
+        return;
+      }
+      // decrement all timers
+      const popTimers = _map(this.game.timers, (timer) => {
+        // form: { timer: int, prompt: string }
+        timer.timer = timer.timer - 1;
+        console.log('updating timer, is now', timer.timer)
+        if(timer.timer <= 0){
+          return {
+            prompt: timer.prompt,
+            promptType: "virus"
+          }
+        } else return null
+      })
+      console.log('ready to be popped:', popTimers)
+      const virusToBePopped = _head(popTimers);
+      if(virusToBePopped){
+        this.game.timers = _remove(this.game.timers, (timer) => {
+          timer.prompt === virusToBePopped.prompt
+        })
+        return virusToBePopped;
+      }
+      this.game.turn = this.game.turn + 1;
+      const randInt = getRandomInt(this.game.freeCards.length);
+      let newCard = this.game.freeCards[randInt];
+      this.game.freeCards.splice(randInt, 1);
+      console.log('incoming card:', newCard)
+      if(newCard.promptType === 'virus') {
+        this.game.timers.push({
+          timer: 2,
+          prompt: newCard.secondary,
+        })
+      }
+      return newCard
     }
   },
   // persist: {
