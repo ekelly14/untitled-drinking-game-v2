@@ -10,6 +10,7 @@ import _forEach from "lodash/forEach";
 import _map from "lodash/map";
 import _head from "lodash/head";
 import _remove from "lodash/remove";
+import _without from "lodash/without"
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -28,6 +29,7 @@ export const useAuthStore = defineStore('auth', {
       turn: 1, // Integer of current turn #, starts at 1 when the first card is pulled
       timers: [], // Will be for virsus. When the card is pulled, add to this timer counter with a countdown, and text of the secondary prompt
       freeCards: [], // Cards still ready to play. Will randomly be pulled from if the current turn is not a virus
+      currentCard: null, // A copy of the current card
     }
   }),
   getters: {
@@ -137,19 +139,25 @@ export const useAuthStore = defineStore('auth', {
     resetGame() {
       this.game.gameStatus = "decks_menu";
       this.game.turn = 1;
-      this.game.timers = {};
+      this.game.timers = [];
       this.game.freeCards = [];
+      this.game.currentCard = null;
     },
     getNextCard() {
       console.log('current turn', this.game.turn)
       console.log('turn limits', this.game.turnLimit)
+      console.log("cards left to be played", this.game.freeCards.length)
+      if(this.game.freeCards.length === 0) {
+        this.game.gameStatus = "game_over"
+        return;
+      }
       if(this.game.turn > this.game.turnLimit ||
          this.game.turn <= 0){
         this.game.gameStatus = "game_over"
         return;
       }
       // decrement all timers
-      const popTimers = _map(this.game.timers, (timer) => {
+      const popTimers = _without(_map(this.game.timers, (timer) => {
         // form: { timer: int, prompt: string }
         timer.timer = timer.timer - 1;
         console.log('updating timer, is now', timer.timer)
@@ -159,13 +167,14 @@ export const useAuthStore = defineStore('auth', {
             promptType: "virus"
           }
         } else return null
-      })
-      console.log('ready to be popped:', popTimers)
+      }), null)
+      console.log('viruses ready to be popped:', popTimers)
       const virusToBePopped = _head(popTimers);
       if(virusToBePopped){
         this.game.timers = _remove(this.game.timers, (timer) => {
           timer.prompt === virusToBePopped.prompt
         })
+        this.game.currentCard = virusToBePopped
         return virusToBePopped;
       }
       this.game.turn = this.game.turn + 1;
@@ -179,10 +188,11 @@ export const useAuthStore = defineStore('auth', {
           prompt: newCard.secondary,
         })
       }
+      this.game.currentCard = newCard
       return newCard
     }
   },
-  // persist: {
-  //   storage: sessionStorage
-  // }
+  persist: {
+    storage: sessionStorage
+  }
 })

@@ -5,8 +5,8 @@
     <div v-if="gameStatus === 'active'">
       <!-- Game has started! -->
       <!-- <button @click="handleNextCard">Next Prompt</button> -->
-      <div v-if="currentCard">
-        {{ currentCard.prompt }}
+      <div v-if="game.currentCard">
+        {{ game.currentCard.prompt }}
       </div>
     </div>
     <div v-if="gameStatus === 'game_over'">
@@ -23,11 +23,9 @@ import PlayerSetup from '../components/PlayerSetup.vue'
 const authStore = useAuthStore();
 const { gameStatus, game } = storeToRefs(authStore);
 
-const currentCard = ref(null)
-
 function handleNextCard() {
   if(gameStatus.value === "active"){
-    currentCard.value = authStore.getNextCard();
+    authStore.getNextCard();
   } else if(gameStatus.value === "game_over"){
     authStore.resetGame();
   }
